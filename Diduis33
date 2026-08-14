@@ -1,0 +1,416 @@
+-- Roblox Script: DARK GUI (Full Edition with Lag Reducer, Sound Alert & Stats Reader)
+
+local Players = game:GetService("Players")
+local SoundService = game:GetService("SoundService")
+local VirtualUser = game:GetService("VirtualUser")
+local StarterGui = game:GetService("StarterGui")
+local RunService = game:GetService("RunService")
+local Stats = game:GetService("Stats")
+local Lighting = game:GetService("Lighting")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+local playerData = {}
+
+local function getPlayerTotalTime(userId)
+    local pInfo = playerData[userId]
+    if not pInfo then return 0 end
+    if pInfo.isOnline and pInfo.joinTime then
+        return pInfo.totalTime + (os.time() - pInfo.joinTime)
+    else
+        return pInfo.totalTime
+    end
+end
+
+local function trackPlayer(plr)
+    if not playerData[plr.UserId] then
+        playerData[plr.UserId] = {
+            totalTime = 0, joinTime = os.time(), isOnline = true, joins = 1, leaves = 0, name = plr.Name, displayName = plr.DisplayName
+        }
+    else
+        playerData[plr.UserId].joinTime = os.time()
+        playerData[plr.UserId].isOnline = true
+        playerData[plr.UserId].joins = playerData[plr.UserId].joins + 1
+    end
+end
+
+for _, plr in pairs(Players:GetPlayers()) do trackPlayer(plr) end
+Players.PlayerAdded:Connect(trackPlayer)
+
+if PlayerGui:FindFirstChild("DarkItachiBase") then PlayerGui["DarkItachiBase"]:Destroy() end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "DarkItachiBase"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = PlayerGui
+
+----------------------------------------------------
+-- مربع قارئ الفريمات والبنك والعداد (FPS / Ping / Timer Display)
+----------------------------------------------------
+local statsFrame = Instance.new("Frame", screenGui)
+statsFrame.Name = "StatsDisplay"
+statsFrame.Size = UDim2.new(0, 160, 0, 70)
+statsFrame.Position = UDim2.new(0.015, 0, 0.015, 0)
+statsFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+statsFrame.BorderSizePixel = 0
+statsFrame.Active = true
+statsFrame.Draggable = true
+
+Instance.new("UICorner", statsFrame).CornerRadius = UDim.new(0, 8)
+
+local statsStroke = Instance.new("UIStroke", statsFrame)
+statsStroke.Color = Color3.fromRGB(180, 30, 30)
+statsStroke.Thickness = 1.5
+
+local statsLayout = Instance.new("UIListLayout", statsFrame)
+statsLayout.Padding = UDim.new(0, 2)
+statsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+statsLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+
+local fpsLabel = Instance.new("TextLabel", statsFrame)
+fpsLabel.Size = UDim2.new(1, -10, 0, 18)
+fpsLabel.BackgroundTransparency = 1
+fpsLabel.TextColor3 = Color3.fromRGB(0, 255, 150)
+fpsLabel.Font = Enum.Font.GothamBold
+fpsLabel.TextSize = 12
+fpsLabel.Text = "FPS: 0"
+
+local pingLabel = Instance.new("TextLabel", statsFrame)
+pingLabel.Size = UDim2.new(1, -10, 0, 18)
+pingLabel.BackgroundTransparency = 1
+pingLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
+pingLabel.Font = Enum.Font.GothamBold
+pingLabel.TextSize = 12
+pingLabel.Text = "PING: 0 ms"
+
+local timeLabel = Instance.new("TextLabel", statsFrame)
+timeLabel.Size = UDim2.new(1, -10, 0, 18)
+timeLabel.BackgroundTransparency = 1
+timeLabel.TextColor3 = Color3.fromRGB(200, 220, 255)
+timeLabel.Font = Enum.Font.GothamBold
+timeLabel.TextSize = 12
+timeLabel.Text = "TIME: 00:00:00"
+
+local frameCount = 0
+local lastCheck = os.clock()
+
+RunService.RenderStepped:Connect(function()
+    frameCount = frameCount + 1
+    local currentTime = os.clock()
+    
+    if currentTime - lastCheck >= 1 then
+        local fps = math.floor(frameCount / (currentTime - lastCheck))
+        fpsLabel.Text = "FPS: " .. tostring(fps)
+        frameCount = 0
+        lastCheck = currentTime
+    end
+end)
+
+local scriptStartTime = os.time()
+
+task.spawn(function()
+    while task.wait(0.5) do
+        local ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+        pingLabel.Text = "PING: " .. tostring(ping) .. " ms"
+        
+        local elapsed = os.time() - scriptStartTime
+        local hours = math.floor(elapsed / 3600)
+        local mins = math.floor((elapsed % 3600) / 60)
+        local secs = elapsed % 60
+        
+        timeLabel.Text = string.format("TIME: %02d:%02d:%02d", hours, mins, secs)
+    end
+end)
+
+----------------------------------------------------
+-- القائمة الرئيسية (Main GUI)
+----------------------------------------------------
+local toggleBtn = Instance.new("ImageButton", screenGui)
+toggleBtn.Size = UDim2.new(0, 48, 0, 48)
+toggleBtn.Position = UDim2.new(0.02, 0, 0.35, 0)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+toggleBtn.Image = "rbxassetid://6031075929"
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
+
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 520, 0, 340)
+mainFrame.Position = UDim2.new(0.5, -260, 0.5, -170)
+mainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 14)
+mainFrame.Active, mainFrame.Draggable = true, true
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
+
+toggleBtn.MouseButton1Click:Connect(function() mainFrame.Visible = not mainFrame.Visible end)
+
+local leftMenu = Instance.new("Frame", mainFrame)
+leftMenu.Size = UDim2.new(0, 125, 1, -58)
+leftMenu.Position = UDim2.new(0, 12, 0, 52)
+leftMenu.BackgroundTransparency = 1
+Instance.new("UIListLayout", leftMenu).Padding = UDim.new(0, 8)
+
+local contentArea = Instance.new("Frame", mainFrame)
+contentArea.Size = UDim2.new(1, -160, 1, -58)
+contentArea.Position = UDim2.new(0, 150, 0, 52)
+contentArea.BackgroundTransparency = 1
+
+local afkPage = Instance.new("ScrollingFrame", contentArea)
+afkPage.Size, afkPage.BackgroundTransparency = UDim2.new(1, 0, 1, 0), 1
+Instance.new("UIListLayout", afkPage).Padding = UDim.new(0, 8)
+
+local ehtesabPage = Instance.new("Frame", contentArea)
+ehtesabPage.Size, ehtesabPage.BackgroundTransparency, ehtesabPage.Visible = UDim2.new(1, 0, 1, 0), 1, false
+
+local chatPage = Instance.new("Frame", contentArea)
+chatPage.Size, chatPage.BackgroundTransparency, chatPage.Visible = UDim2.new(1, 0, 1, 0), 1, false
+
+local samlaPage = Instance.new("ScrollingFrame", contentArea)
+samlaPage.Size, samlaPage.BackgroundTransparency, samlaPage.Visible = UDim2.new(1, 0, 1, 0), 1, false
+Instance.new("UIListLayout", samlaPage).Padding = UDim.new(0, 8)
+
+local function createTabBtn(text, targetPage, isDefault)
+    local btn = Instance.new("TextButton", leftMenu)
+    btn.Size = UDim2.new(1, 0, 0, 35)
+    btn.BackgroundColor3 = isDefault and Color3.fromRGB(180, 30, 30) or Color3.fromRGB(22, 22, 28)
+    btn.TextColor3, btn.Text, btn.Font, btn.TextSize = Color3.fromRGB(255, 255, 255), text, Enum.Font.GothamBold, 12
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    btn.MouseButton1Click:Connect(function()
+        for _, child in pairs(leftMenu:GetChildren()) do
+            if child:IsA("TextButton") then child.BackgroundColor3 = Color3.fromRGB(22, 22, 28) end
+        end
+        btn.BackgroundColor3 = Color3.fromRGB(180, 30, 30)
+        afkPage.Visible, ehtesabPage.Visible, chatPage.Visible, samlaPage.Visible = false, false, false, false
+        targetPage.Visible = true
+    end)
+end
+
+createTabBtn("AFK", afkPage, true)
+createTabBtn("Tracker", ehtesabPage, false)
+createTabBtn("Chat", chatPage, false)
+createTabBtn("سكربتات صمله", samlaPage, false)
+
+local function createAFKBtn(text, onClick)
+    local btn = Instance.new("TextButton", afkPage)
+    btn.Size = UDim2.new(1, -10, 0, 38)
+    btn.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+    btn.TextColor3, btn.Text, btn.Font, btn.TextSize = Color3.fromRGB(230, 230, 230), text, Enum.Font.GothamMedium, 13
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    btn.MouseButton1Click:Connect(function() onClick(btn) end)
+end
+
+createAFKBtn("afk 1", function(btn)
+    pcall(function() loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-AntiAFK-v-AntiKick-V3-v-Kick-Attempt-Logger-27977"))() end)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 140, 60)
+end)
+
+-- إضافة afk 2 (مخفف لاق قوي)
+local isLagReducerActive = false
+createAFKBtn("afk 2 (مخفف لاق)", function(btn)
+    if not isLagReducerActive then
+        isLagReducerActive = true
+        btn.BackgroundColor3 = Color3.fromRGB(40, 140, 60)
+        
+        pcall(function()
+            -- إيقاف الظلال والتأثيرات الخفيفة
+            Lighting.GlobalShadows = false
+            Lighting.FogEnd = 9e9
+            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+            
+            -- تقليل الجودة لجميع المجسمات بالأرضية
+            for _, obj in pairs(game:GetDescendants()) do
+                if obj:IsA("BasePart") then
+                    obj.Material = Enum.Material.SmoothPlastic
+                    obj.Reflectance = 0
+                elseif obj:IsA("Decal") or obj:IsA("Texture") then
+                    obj:Destroy()
+                elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") then
+                    obj.Enabled = false
+                end
+            end
+
+            StarterGui:SetCore("SendNotification", {
+                Title = "Boost Anti-Lag",
+                Text = "تم تفعيل مخفف اللاق بنجاح!",
+                Duration = 4
+            })
+        end)
+    end
+end)
+
+local swadAntiAFKActive = false
+createAFKBtn("afk 3 (سواد)", function(btn)
+    if not swadAntiAFKActive then
+        swadAntiAFKActive = true
+        btn.BackgroundColor3 = Color3.fromRGB(40, 140, 60)
+        
+        pcall(function()
+            StarterGui:SetCore("SendNotification", {
+                Title = "Anti-AFK SWAD",
+                Text = "تم تفعيل مانع طرد سواد",
+                Duration = 5
+            })
+        end)
+
+        LocalPlayer.Idled:Connect(function()
+            if swadAntiAFKActive then
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new())
+            end
+        end)
+    end
+end)
+
+----------------------------------------------------
+-- قسم "سكربتات صمله"
+----------------------------------------------------
+local function createSamlaBtn(text, onClick)
+    local btn = Instance.new("TextButton", samlaPage)
+    btn.Size = UDim2.new(1, -10, 0, 38)
+    btn.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+    btn.TextColor3, btn.Text, btn.Font, btn.TextSize = Color3.fromRGB(230, 230, 230), text, Enum.Font.GothamMedium, 13
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    btn.MouseButton1Click:Connect(function() onClick(btn) end)
+end
+
+createSamlaBtn("VR7 Script", function(btn)
+    pcall(function() loadstring(game:HttpGet("https://rawscripts.net/raw/Universal-Script-VR7-45290"))() end)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 140, 60)
+end)
+
+----------------------------------------------------
+-- قسم الـ Tracker
+----------------------------------------------------
+local myTimeLabel = Instance.new("TextLabel", ehtesabPage)
+myTimeLabel.Size = UDim2.new(1, 0, 0, 20)
+myTimeLabel.Position = UDim2.new(0, 0, 0, 10)
+myTimeLabel.BackgroundTransparency = 1
+myTimeLabel.TextColor3, myTimeLabel.Font, myTimeLabel.TextSize = Color3.fromRGB(255, 255, 255), Enum.Font.GothamBold, 13
+local myStartTime = os.time()
+task.spawn(function()
+    while task.wait(1) do
+        local elapsed = os.time() - myStartTime
+        myTimeLabel.Text = string.format("Time Spent: %02d:%02d:%02d", math.floor(elapsed / 3600), math.floor((elapsed % 3600) / 60), elapsed % 60)
+    end
+end)
+
+local searchBox = Instance.new("TextBox", ehtesabPage)
+searchBox.Size, searchBox.Position = UDim2.new(0.68, 0, 0, 30), UDim2.new(0, 0, 0, 35)
+searchBox.PlaceholderText, searchBox.BackgroundColor3, searchBox.TextColor3 = "اسم اللاعب...", Color3.fromRGB(45, 10, 70), Color3.fromRGB(255, 255, 255)
+Instance.new("UICorner", searchBox).CornerRadius = UDim.new(0, 6)
+
+local startBtn = Instance.new("TextButton", ehtesabPage)
+startBtn.Size, startBtn.Position = UDim2.new(0.28, 0, 0, 30), UDim2.new(0.72, 0, 0, 35)
+startBtn.BackgroundColor3, startBtn.Text, startBtn.TextColor3 = Color3.fromRGB(110, 20, 180), "بدأ", Color3.fromRGB(255, 255, 255)
+Instance.new("UICorner", startBtn).CornerRadius = UDim.new(0, 6)
+
+local playerList = Instance.new("ScrollingFrame", ehtesabPage)
+playerList.Size, playerList.Position, playerList.BackgroundTransparency = UDim2.new(1, 0, 1, -75), UDim2.new(0, 0, 0, 75), 1
+Instance.new("UIListLayout", playerList).Padding = UDim.new(0, 5)
+
+local leaveSound = Instance.new("Sound")
+leaveSound.SoundId = "rbxassetid://138081509"
+leaveSound.Volume = 10
+leaveSound.Parent = SoundService
+
+local function createPlayerCard(targetPlr)
+    local cardName = "Card_" .. targetPlr.UserId
+    if playerList:FindFirstChild(cardName) then return end
+
+    local card = Instance.new("Frame", playerList)
+    card.Name = cardName
+    card.Size, card.BackgroundColor3 = UDim2.new(1, -6, 0, 48), Color3.fromRGB(45, 10, 70)
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
+    
+    local nameLbl = Instance.new("TextLabel", card)
+    nameLbl.Size, nameLbl.Position, nameLbl.BackgroundTransparency = UDim2.new(0.6, 0, 0, 18), UDim2.new(0, 10, 0, 4), 1
+    nameLbl.Text, nameLbl.TextColor3, nameLbl.Font = targetPlr.Name, Color3.fromRGB(255, 255, 255), Enum.Font.GothamBold
+
+    local infoLbl = Instance.new("TextLabel", card)
+    infoLbl.Size, infoLbl.Position, infoLbl.BackgroundTransparency = UDim2.new(0.8, 0, 0, 18), UDim2.new(0, 10, 0, 22), 1
+    infoLbl.TextColor3, infoLbl.Font, infoLbl.TextSize = Color3.fromRGB(200, 180, 220), Enum.Font.Gotham, 10
+
+    task.spawn(function()
+        while card and card.Parent do
+            local pInfo = playerData[targetPlr.UserId]
+            if pInfo then
+                local elapsed = getPlayerTotalTime(targetPlr.UserId)
+                infoLbl.Text = string.format("Joins: %d | Leaves: %d | Time: %02d:%02d:%02d", pInfo.joins, pInfo.leaves, math.floor(elapsed/3600), math.floor((elapsed%3600)/60), elapsed%60)
+            end
+            task.wait(1)
+        end
+    end)
+end
+
+startBtn.MouseButton1Click:Connect(function()
+    local nameText = searchBox.Text:lower()
+    if nameText == "" then return end
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr.Name:lower():sub(1, #nameText) == nameText then createPlayerCard(plr) break end
+    end
+end)
+
+----------------------------------------------------
+-- قسم الشات (Chat Section)
+----------------------------------------------------
+local chatBoxFrame = Instance.new("ScrollingFrame", chatPage)
+chatBoxFrame.Size, chatBoxFrame.Position, chatBoxFrame.BackgroundColor3 = UDim2.new(1, 0, 1, -45), UDim2.new(0, 0, 0, 0), Color3.fromRGB(20, 20, 26)
+chatBoxFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+chatBoxFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Instance.new("UICorner", chatBoxFrame).CornerRadius = UDim.new(0, 8)
+
+local chatListLayout = Instance.new("UIListLayout", chatBoxFrame)
+chatListLayout.Padding = UDim.new(0, 6)
+chatListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local msgInput = Instance.new("TextBox", chatPage)
+msgInput.Size, msgInput.Position = UDim2.new(0.72, 0, 0, 35), UDim2.new(0, 0, 1, -35)
+msgInput.PlaceholderText, msgInput.BackgroundColor3, msgInput.TextColor3 = "اكتب رسالتك...", Color3.fromRGB(30, 30, 40), Color3.fromRGB(255, 255, 255)
+msgInput.Font, msgInput.TextSize = Enum.Font.Gotham, 13
+Instance.new("UICorner", msgInput).CornerRadius = UDim.new(0, 6)
+
+local sendBtn = Instance.new("TextButton", chatPage)
+sendBtn.Size, sendBtn.Position = UDim2.new(0.25, 0, 0, 35), UDim2.new(0.75, 0, 1, -35)
+sendBtn.BackgroundColor3, sendBtn.Text, sendBtn.TextColor3 = Color3.fromRGB(180, 30, 30), "إرسال", Color3.fromRGB(255, 255, 255)
+sendBtn.Font, sendBtn.TextSize = Enum.Font.GothamBold, 13
+Instance.new("UICorner", sendBtn).CornerRadius = UDim.new(0, 6)
+
+local function sendMsg()
+    local rawText = msgInput.Text
+    if rawText:match("%S") then
+        local msgLabel = Instance.new("TextLabel", chatBoxFrame)
+        msgLabel.Size = UDim2.new(1, -12, 0, 0)
+        msgLabel.BackgroundTransparency = 1
+        msgLabel.Text = "[" .. LocalPlayer.Name .. "]: " .. rawText
+        msgLabel.TextColor3 = Color3.fromRGB(235, 235, 235)
+        msgLabel.Font = Enum.Font.Gotham
+        msgLabel.TextSize = 13
+        msgLabel.TextWrapped = true
+        msgLabel.TextXAlignment = Enum.TextXAlignment.Left
+        msgLabel.AutomaticSize = Enum.AutomaticSize.Y
+        
+        msgInput.Text = ""
+        task.wait(0.1)
+        chatBoxFrame.CanvasPosition = Vector2.new(0, chatBoxFrame.AbsoluteCanvasSize.Y)
+    end
+end
+
+sendBtn.MouseButton1Click:Connect(sendMsg)
+msgInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed then sendMsg() end
+end)
+
+Players.PlayerRemoving:Connect(function(plr)
+    local pInfo = playerData[plr.UserId]
+    if pInfo then
+        if pInfo.isOnline and pInfo.joinTime then
+            pInfo.totalTime = pInfo.totalTime + (os.time() - pInfo.joinTime)
+            pInfo.joinTime = nil
+        end
+        pInfo.isOnline = false
+        pInfo.leaves = pInfo.leaves + 1
+    end
+
+    local cardName = "Card_" .. plr.UserId
+    if playerList:FindFirstChild(cardName) then
+        leaveSound:Play()
+    end
+end)
